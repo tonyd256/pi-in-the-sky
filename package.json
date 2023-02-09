@@ -6,9 +6,8 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "dotenv": "^16.0.3",
-    "imagemin": "^8.0.1",
-    "imagemin-mozjpeg": "^10.0.0",
-    "instagram-private-api": "^1.45.3",
+    "lodash": "^4.17.21",
+    "redis": "^4.6.4",
     "sharp": "^0.31.3",
     "twitter": "^1.7.1",
     "twitter-api-v2": "^1.13.0",

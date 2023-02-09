@@ -4,6 +4,10 @@ const path = require('path');
 const fs = require('fs');
 const chokidar = require('chokidar');
 const winston = require('winston');
+const sharp = require("sharp");
+const dns = require('dns');
+const { createClient } = require('redis');
+const _ = require('lodash');
 
 require('dotenv').config();
 
@@ -22,9 +26,22 @@ const twitter = new TwitterApi({
   access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
 
+/* Logging */
+
 const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.json(),
+  format: winston.format.combine(
+    winston.format.prettyPrint(),
+    winston.format.splat(),
+    winston.format.simple(),
+    winston.format.printf(context => {
+      if (typeof context.message === 'object') {
+        const msgstr = JSON.stringify(context.message, null, '\t');
+        return `[${context.level}]${msgstr}`;
+      }
+      return context.message;
+    })
+  ),
   defaultMeta: { service: 'user-service' },
   transports: [
     new winston.transports.File({ filename: 'error.log', level: 'error' }),
@@ -34,48 +51,124 @@ const logger = winston.createLogger({
 
 if (process.env.NODE_ENV !== 'production') {
   logger.add(new winston.transports.Console({
-    format: winston.format.simple(),
+    format: winston.format.combine(
+      winston.format.prettyPrint(),
+      winston.format.splat(),
+      winston.format.simple(),
+      winston.format.printf(context => {
+        if (typeof context.message === 'object') {
+          const msgstr = JSON.stringify(context.message, null, '\t');
+          return `[${context.level}]${msgstr}`;
+        }
+        return context.message;
+      })
+    ),
   }));
 }
 
+/* Helpers */
+
+async function isConnected() {
+  return new Promise(function (resolve, reject) {
+    dns.lookup('google.com', function (err, address, family) {
+      if (err) reject(err);
+      resolve(address);
+    });
+  });
+}
+
+/* Redis */
+
+const client = createClient();
+client.on('error', err => logger.error('Redis Client Error %o', err));
+
 chokidar.watch([
-  path.join(os.homedir(), 'FTP/media/*.jpg'),
-  path.join(os.homedir(), 'FTP/media/*.mp4')],
-  { persistent: true, ignoreInitial: true, awaitWriteFinish: true })
+  path.join(os.homedir(), 'FTP/media/*.jpg')],
+  // path.join(os.homedir(), 'FTP/media#<{(|.mp4')],
+  { persistent: true, ignoreInitial: false, awaitWriteFinish: true, alwaysStat: true })
   .on('add', processMedia);
 
-function processMedia(file) {
-  if (path.extname(file) === '.jpg') {
-    logger.info('post image: '+file);
-    postToTwitter(file, 'image/jpg');
-  } else if (path.extname(file) === '.mp4') {
-    logger.info('post video: '+file);
-    postToTwitter(file, 'video/mp4');
+async function processMedia(file, stat) {
+  // only resize if more than half a meg
+  if (stat.size > 500000) {
+    logger.info('resize image');
+    await sharp(file)
+      .resize(1080, 1080, {
+        fit: 'outside',
+        withoutEnlargement: true
+      })
+      .toFormat("jpeg", { mozjpeg: true })
+      .toFile(file);
+  }
+
+  await client.connect();
+  const file = client.hGet('files', file);
+
+  if (!file) {
+    await client.hSet("files", file, stat.ctime);
+  }
+
+  await client.disconnect();
+  await postIfCan();
+}
+
+async function postIfCan() {
+  var moreToPost = false;
+
+  try {
+    await isConnected();
+
+    await client.connect();
+    const files = await client.hGetAll("files");
+
+    if (!_.isEmpty(files)) {
+      const file = _.head(_.sortBy(_.toPairs(files), function (o) { return o[1]; }));
+
+      if (file) {
+        await postToTwitter(file[0]);
+        await deleteFile(file[0]);
+      }
+    }
+
+    await client.disconnect();
+
+    if (_.keys(files) > 1) {
+      moreToPost = true;
+    }
+  } catch (e) {
+    logger.error(e);
+
+    if (e.code && e.code === 'ENOTFOUND') {
+      setTimeout(postIfCan, 5000);
+    }
+  }
+
+  if (moreToPost) {
+    postIfCan();
   }
 }
 
+async function deleteFile(file) {
+  await fs.unlink(file);
+  await client.hDel("files", file);
+  logger.info('file deleted');
+}
+
 // TWITTER
-async function postToTwitter(file, type) {
-  try {
-    logger.info('init media upload to twitter');
-    const init = await initUpload(fs.statSync(file).size, type); // Declare that you wish to upload some media
-    logger.info(init);
-    logger.info('append media to twitter');
-    const append = await appendUpload(init.media_id_string, fs.readFileSync(file)) // Send the data for the media
-    logger.info(append);
-    logger.info('finalize media to twitter');
-    const finalize = await finalizeUpload(init.media_id_string) // Declare that you are done uploading chunks
-    logger.info(finalize);
-    logger.info('post media to twitter');
-    const post = await postMedia(init.media_id_string);
-    logger.info(post);
-    logger.info('done media post to twitter');
-  } catch (e) {
-    logger.info('media post to twitter had an error');
-    logger.error(e);
-    if (e.data && e.data.errors)
-      logger.error(e.data.errors);
-  }
+async function postToTwitter(file) {
+    // logger.info('init media upload to twitter');
+    // const init = await initUpload(info.size, type); // Declare that you wish to upload some media
+    // logger.info(init);
+    // logger.info('append media to twitter');
+    // const append = await appendUpload(init.media_id_string, data) // Send the data for the media
+    // logger.info(append);
+    // logger.info('finalize media to twitter');
+    // const finalize = await finalizeUpload(init.media_id_string) // Declare that you are done uploading chunks
+    // logger.info(finalize);
+    // logger.info('post media to twitter');
+    // const post = await postMedia(init.media_id_string);
+    // logger.info(post);
+    // logger.info('done media post to twitter');
 }
 
 /**
