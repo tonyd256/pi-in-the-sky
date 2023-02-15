@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 require('dotenv').config();
 
 const os = require('os');
@@ -94,17 +93,23 @@ async function deleteFile(file) {
 }
 
 async function run() {
-  await client.connect();
+  try {
+    await client.connect();
+    const directory =     path.join(os.homedir(), 'FTP/media/*.jpg');
+    logger.info("watching: " + directory);
 
-  chokidar.watch([
-    path.join(os.homedir(), 'FTP/media/*.jpg')],
-    // path.join(os.homedir(), 'FTP/media#<{(|.mp4')],
-    { persistent: true, ignoreInitial: false, awaitWriteFinish: true, alwaysStat: true })
-    .on('add', processMedia);
+    chokidar.watch([directory],
+      // path.join(os.homedir(), 'FTP/media#<{(|.mp4')],
+      { persistent: true, ignoreInitial: false, awaitWriteFinish: true, alwaysStat: true })
+      .on('add', processMedia);
 
-  setTimeout(postIfCan, 5000);
+    setTimeout(postIfCan, 5000);
 
-  gps.activate();
+    gps.activate();
+  } catch (e) {
+    logger.error("Could not start.");
+    logger.error(e);
+  }
 }
 
 run();
