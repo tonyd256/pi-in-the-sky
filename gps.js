@@ -5,6 +5,11 @@ const { SerialPort, ReadlineParser } = require('serialport');
 const { client } = require('./db');
 const course = require('./data/Black_Canyon_100K_2023.json');
 
+const formatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1,
+});
+
 /* GSP Serial Port */
 
 if (process.env.NODE_ENV === 'production') {
@@ -33,6 +38,8 @@ function activate() {
 
 function distanceFromStart(point) {
   const nearestPoint = geo.findNearest(point, course.features[11].geometry.coordinates);
+  if (!geo.isPointWithinRadius(point, nearestPoint, 1000)) { return -1; }
+
   const index = _.findIndex(course.features[11].geometry.coordinates, function (a) { return a[0] === nearestPoint[0] && a[1] === nearestPoint[1]; });
   const distanceM = geo.getPathLength(course.features[11].geometry.coordinates.slice(0, index));
   return distanceM/1000; // meters to km
@@ -52,6 +59,8 @@ function isCloseToPoint(point) {
 
 function readGPSData(data) {
   if (!data.startsWith('$GPRMC')) return;
+  logger.info(data);
+
   const datas = data.split(',');
   if (datas[2] === 'V') return;
 
@@ -61,7 +70,23 @@ function readGPSData(data) {
   const lat = decodeGeo(datas[3], dirLat);
   const dirLon = datas[6];
   const lon = decodeGeo(datas[5], dirLon);
-  saveGPSData({ lon, lat, time, date, dist: distanceFromStart([lon, lat]), title: isCloseToPoint([lon, lat]) });
+  const dist = distanceFromStart([lon, lat]);
+  const title = buildTitle(dist, isCloseToPoint([lon, lat]));
+  logger.info(`lat: ${lat}, lon: ${lon}, time: ${time}, date: ${date}, dist: ${dist}, title: ${title}`);
+  saveGPSData({ lon, lat, time, date, dist, title });
+}
+
+function buildTitle(dist, pointTitle) {
+  if (dist === -1) {
+    return "Not on course."
+  }
+
+  var title = "Near " + pointTitle;
+  if (pointTitle !== "") {
+    title += ". ";
+  }
+
+  title += formatter.format(dist) + "km - " + formatter.format(dist * 0.6214) + "mi in. " + Math.ceil(dist/100) + "% done!";
 }
 
 function decodeGeo(data, dir) {

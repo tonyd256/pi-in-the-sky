@@ -14,37 +14,35 @@ const twitter = new TwitterApi({
   access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
 
+const { aditionalText } = require('./data/additionalText.json');
+
 /* Twitter */
 
-async function postToTwitter(file) {
-  var init, append, finalize, post;
+async function postToTwitter(file, title) {
+  if (process.env.NODE_ENV !== 'production') {
+    logger.info('Not production. Will not post to Twitter.');
+    return;
+  }
+
   logger.info('init media upload to twitter: ' + file);
 
-  if (process.env.NODE_ENV === 'production') {
-    init = await initUpload(info.size, type); // Declare that you wish to upload some media
-    logger.info(init);
-  }
+  const init = await initUpload(info.size, type); // Declare that you wish to upload some media
+  logger.info(init);
 
   logger.info('append media to twitter');
 
-  if (process.env.NODE_ENV === 'production') {
-    append = await appendUpload(init.media_id_string, data) // Send the data for the media
-    logger.info(append);
-  }
+  const append = await appendUpload(init.media_id_string, data) // Send the data for the media
+  logger.info(append);
 
   logger.info('finalize media to twitter');
 
-  if (process.env.NODE_ENV === 'production') {
-    finalize = await finalizeUpload(init.media_id_string) // Declare that you are done uploading chunks
-    logger.info(finalize);
-  }
+  const finalize = await finalizeUpload(init.media_id_string) // Declare that you are done uploading chunks
+  logger.info(finalize);
 
   logger.info('post media to twitter');
 
-  if (process.env.NODE_ENV === 'production') {
-    post = await postMedia(init.media_id_string);
-    logger.info(post);
-  }
+  const post = await postMedia(init.media_id_string, title + additionalText);
+  logger.info(post);
 
   logger.info('done media post to twitter');
 }
@@ -87,9 +85,9 @@ function finalizeUpload (mediaId) {
   });
 }
 
-function postMedia(mediaId) {
+function postMedia(mediaId, status) {
   return makePost('statuses/update', {
-    status: 'test',
+    status,
     media_ids: mediaId
   });
 }

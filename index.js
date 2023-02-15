@@ -46,7 +46,10 @@ async function processMedia(file, stat) {
       logger.info('save image to db');
       await client.hSet("files", file, stat.ctime.getTime());
 
-      await client.hGetAll("gps");
+      const gpsData = await client.hGetAll("gps");
+      if (gpsData) {
+        await client.hSet("files", file + ".title", gpsData.title);
+      }
     }
   } catch (e) {
     logger.error("There was an error in processing");
@@ -57,16 +60,17 @@ async function processMedia(file, stat) {
 async function postIfCan() {
   try {
     const files = await client.hGetAll("files");
+    const noTitles = _.filter(files, function (f) { return !f.endsWith(".title"); });
 
-    if (_.keys(files).length > 0) {
+    if (_.keys(noTitles).length > 0) {
       logger.info('check if connected');
       await isConnected();
 
-      if (!_.isEmpty(files)) {
-        const file = _.head(_.sortBy(_.toPairs(files), function (o) { return o[1]; }));
+      if (!_.isEmpty(noTitles)) {
+        const file = _.head(_.sortBy(_.toPairs(noTitles), function (o) { return o[1]; }));
 
         if (file) {
-          await twitter.postToTwitter(file[0]);
+          await twitter.postToTwitter(file[0], files[file+".title"]);
           await deleteFile(file[0]);
         }
       }
@@ -86,6 +90,7 @@ async function postIfCan() {
 async function deleteFile(file) {
   await fs.unlink(file);
   await client.hDel("files", file);
+  await client.hDel("files", file+".title");
 }
 
 async function run() {
