@@ -27,8 +27,13 @@ function activate() {
   if (process.env.NODE_ENV === 'production') {
     try {
       const writePort = new SerialPort({ path: '/dev/ttyUSB2', baudRate: 115200 });
-      writePort.write('AT+QGPS=1\r');
-      writePort.close();
+      writePort.write('AT+QGPS=1', function (err) {
+        if (err) {
+          logger.error(err);
+        }
+
+        writePort.close();
+      });
     } catch (e) {
       logger.error("Error activating GPS.");
       logger.error(e);
@@ -58,10 +63,11 @@ function isCloseToPoint(point) {
 }
 
 function readGPSData(data) {
-  if (!data.startsWith('$GPRMC')) return;
-  logger.info(data);
+  const str = data.toString('utf8');
+  if (!str.startsWith('$GPRMC')) return;
+  logger.info(str);
 
-  const datas = data.split(',');
+  const datas = str.split(',');
   if (datas[2] === 'V') return;
 
   const time = datas[1].slice(0,2) + ":" + datas[1].slice(2,4) + ":" + datas[1].slice(4,6);
