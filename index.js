@@ -43,11 +43,11 @@ async function processMedia(file, stat) {
 
     if (!fileTime) {
       logger.info('save image to db');
-      await client.hSet("files", file, stat.ctime.getTime());
+      await client.hSet("files", file, parseInt(stat.ctime.getTime()));
       logger.info('saved: '+ file + ' at ' + stat.ctime.getTime());
 
       const gpsData = await client.hGetAll("gps");
-      if (gpsData) {
+      if (!_.isEmpty(gpsData)) {
         logger.info(gpsData);
         await client.hSet("files", file + ".title", gpsData.title);
         logger.info('save gps');
@@ -72,7 +72,7 @@ async function postIfCan() {
         const file = _.head(_.sortBy(_.toPairs(noTitles), function (o) { return o[1]; }));
 
         if (file) {
-          await twitter.postToTwitter(file[0], files[file+".title"]);
+          await twitter.postToTwitter(file[0], files[file[0]+".title"] || "");
           await deleteFile(file[0]);
         }
       }
@@ -98,11 +98,15 @@ async function deleteFile(file) {
 async function run() {
   try {
     await client.connect();
-    const directory =     path.join(os.homedir(), 'FTP/media/*.jpg');
-    logger.info("watching: " + directory);
+    const directories = [
+      path.join(os.homedir(), 'FTP/media/*.jpg'),
+      path.join(os.homedir(), 'FTP/media/*.JPG'),
+      // path.join(os.homedir(), 'FTP/media#<{(|.mp4'),
+    ];
+    logger.info("watching: " + directories.join(", "));
 
-    chokidar.watch([directory],
-      // path.join(os.homedir(), 'FTP/media#<{(|.mp4')],
+    chokidar.watch(
+      directories,
       { persistent: true, ignoreInitial: false, awaitWriteFinish: true, alwaysStat: true })
       .on('add', processMedia);
 
