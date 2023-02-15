@@ -64,17 +64,16 @@ async function postIfCan() {
     const files = await client.hGetAll("files");
     const noTitles = _.filter(files, function (f) { return !f.endsWith(".title"); });
 
-    if (_.keys(noTitles).length > 0) {
+    logger.info(noTitles);
+    if (!_.isEmpty(noTitles)) {
       logger.info('check if connected');
       await isConnected();
 
-      if (!_.isEmpty(noTitles)) {
-        const file = _.head(_.sortBy(_.toPairs(noTitles), function (o) { return o[1]; }));
+      const file = _.head(_.sortBy(_.toPairs(noTitles), function (o) { return o[1]; }));
 
-        if (file) {
-          await twitter.postToTwitter(file[0], files[file[0]+".title"] || "");
-          await deleteFile(file[0]);
-        }
+      if (file) {
+        await twitter.postToTwitter(file[0], files[file[0]+".title"] || "");
+        await deleteFile(file[0]);
       }
     }
 
