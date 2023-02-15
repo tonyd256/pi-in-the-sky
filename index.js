@@ -65,7 +65,6 @@ async function postIfCan() {
     const keys = _.keys(files);
     const noTitles = _.filter(keys, function (f) { return !f.endsWith(".title"); });
 
-    logger.info(keys);
     if (!_.isEmpty(keys)) {
       logger.info('check if connected');
       await isConnected();
