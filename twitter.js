@@ -15,7 +15,7 @@ const twitter = new TwitterApi({
   access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET
 });
 
-const { aditionalText } = require('./data/additionalText.json');
+const at = require('./data/additionalText.json');
 
 /* Twitter */
 
@@ -45,7 +45,7 @@ async function postToTwitter(file, title) {
 
   logger.info('post media to twitter');
 
-  const post = await postMedia(init.media_id_string, title + additionalText);
+  const post = await postMedia(init.media_id_string, title + at.additionalText);
   logger.info(post);
 
   logger.info('done media post to twitter');
