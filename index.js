@@ -62,22 +62,23 @@ async function processMedia(file, stat) {
 async function postIfCan() {
   try {
     const files = await client.hGetAll("files");
-    const noTitles = _.filter(files, function (f) { return !f.endsWith(".title"); });
+    const keys = _.keys(files);
+    const noTitles = _.filter(keys, function (f) { return !f.endsWith(".title"); });
 
-    logger.info(noTitles);
-    if (!_.isEmpty(noTitles)) {
+    logger.info(keys);
+    if (!_.isEmpty(keys)) {
       logger.info('check if connected');
       await isConnected();
 
-      const file = _.head(_.sortBy(_.toPairs(noTitles), function (o) { return o[1]; }));
+      const file = _.head(_.sortBy(keys, function (o) { return parseInt(files[o]); }));
 
       if (file) {
-        await twitter.postToTwitter(file[0], files[file[0]+".title"] || "");
-        await deleteFile(file[0]);
+        await twitter.postToTwitter(file, files[file+".title"] || "");
+        await deleteFile(file);
       }
     }
 
-    if (_.keys(files).length > 1) {
+    if (keys.length > 1) {
       await postIfCan();
     }
   } catch (e) {

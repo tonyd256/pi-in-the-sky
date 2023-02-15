@@ -26,8 +26,10 @@ async function postToTwitter(file, title) {
   }
 
   logger.info('init media upload to twitter: ' + file);
-  const info = fs.stat(file);
+  const info = await fs.stat(file);
+  const data = await fs.readFile(file);
 
+  const type = "image/jpeg";
   const init = await initUpload(info.size, type); // Declare that you wish to upload some media
   logger.info(init);
 
