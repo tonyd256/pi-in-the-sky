@@ -1,3 +1,4 @@
+const fs = require('fs/promises');
 const logger = require('./logger');
 const { TwitterApi } = require('twitter-api-v2');
 const Twitter = require('twitter');
@@ -25,6 +26,7 @@ async function postToTwitter(file, title) {
   }
 
   logger.info('init media upload to twitter: ' + file);
+  const info = fs.stat(file);
 
   const init = await initUpload(info.size, type); // Declare that you wish to upload some media
   logger.info(init);

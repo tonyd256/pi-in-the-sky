@@ -44,10 +44,13 @@ async function processMedia(file, stat) {
     if (!fileTime) {
       logger.info('save image to db');
       await client.hSet("files", file, stat.ctime.getTime());
+      logger.info('saved: '+ file + ' at ' + stat.ctime.getTime());
 
       const gpsData = await client.hGetAll("gps");
       if (gpsData) {
+        logger.info(gpsData);
         await client.hSet("files", file + ".title", gpsData.title);
+        logger.info('save gps');
       }
     }
   } catch (e) {
