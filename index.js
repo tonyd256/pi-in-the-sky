@@ -77,7 +77,8 @@ async function postIfCan() {
       }
     }
 
-    if (keys.length > 1) {
+    if (noTitles.length > 1) {
+      logger.info('more to post');
       await postIfCan();
     }
   } catch (e) {
@@ -85,7 +86,7 @@ async function postIfCan() {
     logger.error(e.message);
   }
 
-  setTimeout(postIfCan, 5000);
+  setTimeout(postIfCan, 10000);
 }
 
 async function deleteFile(file) {
@@ -109,7 +110,7 @@ async function run() {
       { persistent: true, ignoreInitial: false, awaitWriteFinish: true, alwaysStat: true })
       .on('add', processMedia);
 
-    setTimeout(postIfCan, 5000);
+    setTimeout(postIfCan, 10000);
 
     gps.activate();
   } catch (e) {
