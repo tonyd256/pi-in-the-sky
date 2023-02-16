@@ -31,22 +31,22 @@ async function postToTwitter(file, title) {
 
   const type = "image/jpeg";
   const init = await initUpload(info.size, type); // Declare that you wish to upload some media
-  logger.info(init);
+  // logger.info(init);
 
   logger.info('append media to twitter');
 
   const append = await appendUpload(init.media_id_string, data) // Send the data for the media
-  logger.info(append);
+  // logger.info(append);
 
   logger.info('finalize media to twitter');
 
   const finalize = await finalizeUpload(init.media_id_string) // Declare that you are done uploading chunks
-  logger.info(finalize);
+  // logger.info(finalize);
 
   logger.info('post media to twitter');
 
   const post = await postMedia(init.media_id_string, title + at.additionalText);
-  logger.info(post);
+  // logger.info(post);
 
   logger.info('done media post to twitter');
 }

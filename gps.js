@@ -3,8 +3,8 @@ const logger = require('./logger');
 const geo = require('geolib');
 const { SerialPort, ReadlineParser } = require('serialport');
 const { client } = require('./db');
-// const course = require('./data/Black_Canyon_100K_2023.json');
-const course = require('./data/TrailThursday.json');
+const course = require('./data/Black_Canyon_100K_2023.json');
+// const course = require('./data/TrailThursday.json');
 
 const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
@@ -12,12 +12,18 @@ const formatter = new Intl.NumberFormat('en-US', {
 });
 
 /* GSP Serial Port */
+var writePort;
 
 if (process.env.NODE_ENV === 'production') {
   try {
-    const readPort = new SerialPort({ path: '/dev/ttyUSB1', baudRate: 115200 });
-    readPort.pipe(new ReadlineParser());
-    readPort.on('data', readGPSData);
+    writePort = new SerialPort({ path: '/dev/ttyUSB2', baudRate: 115200 });
+    writePort.pipe(new ReadlineParser());
+    writePort.on('error', function(err) {
+      logger.error('Serial Port Error: ', err.message)
+    });
+    // const readPort = new SerialPort({ path: '/dev/ttyUSB1', baudRate: 115200 });
+    // readPort.pipe(new ReadlineParser());
+    // readPort.on('data', readGPSData);
   } catch (e) {
     logger.error("Error monitoring GPS.");
     logger.error(e);
@@ -27,19 +33,31 @@ if (process.env.NODE_ENV === 'production') {
 function activate() {
   if (process.env.NODE_ENV === 'production') {
     try {
-      const writePort = new SerialPort({ path: '/dev/ttyUSB2', baudRate: 115200 });
-      writePort.write('AT+QGPS=1', function (err) {
-        if (err) {
-          logger.error(err);
-        }
-
-        writePort.close();
-      });
+      writePort.write('AT+QGPS=1\r');
     } catch (e) {
       logger.error("Error activating GPS.");
       logger.error(e);
     }
   }
+}
+
+function getGPS() {
+  return new Promise( function (resolve, reject) {
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        writePort.write('AT+QGPSLOC?\r');
+        const res = writePort.read();
+        logger.info(res.toString('utf8'));
+        resolve(readDirectGPSData(res));
+      } catch (e) {
+        logger.error("Error activating GPS.");
+        logger.error(e);
+        reject(e);
+      }
+    } else {
+      resolve({});
+    }
+  });
 }
 
 function distanceFromStart(point) {
@@ -62,6 +80,24 @@ function isCloseToPoint(point) {
   }
 
   return "";
+}
+
+function readDirectGPSData(data) {
+  const str = data.toString('utf8');
+  const regex = /QGPSLOC: (\d*).*?,(\d*.?\d*)(\w),(\d*.?\d*)(\w),.*?,.*?,.*?,.*?,.*?,.*?,(\d*)/g;
+  const matches = regex.exec(str);
+  if (_.isEmpty(matches)) return {};
+
+  const time = matches[1].slice(0,2) + ":" + matches[1].slice(2,4) + ":" + matches[1].slice(4,6);
+  const date = matches[6].slice(0,2) + "/" + matches[6].slice(2,4) + "/" + matches[6].slice(4,6);
+  const dirLat = matches[3];
+  const lat = decodeGeo(matches[2], dirLat);
+  const dirLon = matches[5];
+  const lon = decodeGeo(matches[4], dirLon);
+  const dist = distanceFromStart([lon, lat]);
+  const title = buildTitle(dist, isCloseToPoint([lon, lat]));
+  logger.info(`lat: ${lat}, lon: ${lon}, time: ${time}, date: ${date}, dist: ${dist}, title: ${title}`);
+  return { lon, lat, time, date, dist, title };
 }
 
 function readGPSData(data) {
@@ -125,5 +161,6 @@ async function getData() {
 
 module.exports = {
   activate,
-  getData
+  getData,
+  getGPS
 };
