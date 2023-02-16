@@ -46,7 +46,14 @@ function getGPS() {
     if (process.env.NODE_ENV === 'production') {
       try {
         writePort.write('AT+QGPSLOC?\r');
+        await sleep(1000);
         const res = writePort.read();
+
+        if (_.isEmpty(res)) {
+          resolve({});
+          return;
+        }
+
         logger.info(res.toString('utf8'));
         resolve(readDirectGPSData(res));
       } catch (e) {
@@ -58,6 +65,10 @@ function getGPS() {
       resolve({});
     }
   });
+}
+
+async function sleep(time) {
+  return new Promise( function (resolve) { setTimeout(resolve, time); });
 }
 
 function distanceFromStart(point) {
