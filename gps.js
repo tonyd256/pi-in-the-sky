@@ -17,7 +17,6 @@ var writePort;
 if (process.env.NODE_ENV === 'production') {
   try {
     writePort = new SerialPort({ path: '/dev/ttyUSB2', baudRate: 115200 });
-    writePort.pipe(new ReadlineParser());
     writePort.on('error', function(err) {
       logger.error('Serial Port Error: ', err.message)
     });
@@ -42,12 +41,17 @@ function activate() {
 }
 
 function getGPS() {
-  return new Promise( function (resolve, reject) {
+  return new Promise( async function (resolve, reject) {
     if (process.env.NODE_ENV === 'production') {
       try {
         writePort.write('AT+QGPSLOC?\r');
         await sleep(1000);
-        const res = writePort.read();
+        var res = writePort.read();
+
+        if (_.isEmpty(res)) {
+          await sleep(1000);
+          res = writePort.read();
+        }
 
         if (_.isEmpty(res)) {
           resolve({});

@@ -38,7 +38,16 @@ async function processMedia(file, stat) {
         .toBuffer();
       await sharp(buff).toFile(file);
     }
+  } catch (e) {
+    logger.error("There was an error in sharp");
+    logger.error(e.message);
+    if (e.message == "VipsJpeg: Premature end of input file") {
+      processMedia(file, stat); // try again
+    }
+    return;
+  }
 
+  try {
     const fileTime = await client.hGet('files', file);
 
     if (!fileTime) {
