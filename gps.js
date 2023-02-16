@@ -3,7 +3,8 @@ const logger = require('./logger');
 const geo = require('geolib');
 const { SerialPort, ReadlineParser } = require('serialport');
 const { client } = require('./db');
-const course = require('./data/Black_Canyon_100K_2023.json');
+// const course = require('./data/Black_Canyon_100K_2023.json');
+const course = require('./data/TrailThursday.json');
 
 const formatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
@@ -42,11 +43,12 @@ function activate() {
 }
 
 function distanceFromStart(point) {
-  const nearestPoint = geo.findNearest(point, course.features[11].geometry.coordinates);
+  const route = _.find(course.features, { geometry: { type: "LineString" } });
+  const nearestPoint = geo.findNearest(point, route.geometry.coordinates);
   if (!geo.isPointWithinRadius(point, nearestPoint, 1000)) { return -1; }
 
-  const index = _.findIndex(course.features[11].geometry.coordinates, function (a) { return a[0] === nearestPoint[0] && a[1] === nearestPoint[1]; });
-  const distanceM = geo.getPathLength(course.features[11].geometry.coordinates.slice(0, index));
+  const index = _.findIndex(route.geometry.coordinates, function (a) { return a[0] === nearestPoint[0] && a[1] === nearestPoint[1]; });
+  const distanceM = geo.getPathLength(route.geometry.coordinates.slice(0, index));
   return distanceM/1000; // meters to km
 }
 
