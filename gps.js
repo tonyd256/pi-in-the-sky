@@ -66,10 +66,12 @@ function isCloseToPoint(point) {
 
 function readGPSData(data) {
   const str = data.toString('utf8');
-  if (!str.startsWith('$GPRMC')) return;
+  const matches = str.match(/($GPRMC,.+?,.+?,.+?,.+?,.+?,.+?,.+?,.+?,.+?),/g);
+  if (matches.length === 0) return;
   logger.info(str);
 
-  const datas = str.split(',');
+  const pick = matches[matches.length-1];
+  const datas = pick.split(',');
   if (datas[2] === 'V') return;
 
   const time = datas[1].slice(0,2) + ":" + datas[1].slice(2,4) + ":" + datas[1].slice(4,6);
